@@ -16,6 +16,8 @@ On a fresh Ubuntu/Debian VPS, run:
 curl -fsSL https://raw.githubusercontent.com/xzydip/panel/main/install.sh -o /tmp/xzy-install.sh
 sudo bash /tmp/xzy-install.sh https://github.com/xzydip/panel.git
 ```
+curl -fsSL https://raw.githubusercontent.com/xzydip/panel/main/install.sh | sudo bash -s -- https://github.com/xzydip/panel.git
+
 
 The installer installs Docker, clones or updates `xzydip/panel`, opens TCP `8080`, and starts the panel.
 
