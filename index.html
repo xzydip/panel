@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Xzy Panel</title>
+  <script>
+    let session = null;
+    try { session = JSON.parse(localStorage.getItem('nebula-session') || 'null'); } catch {}
+    window.location.replace(session && session.username ? 'panel.html' : 'login.html');
+  </script>
+</head>
+<body>
+  <p>Opening Xzy Panel...</p>
+</body>
+</html>

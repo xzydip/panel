@@ -1,0 +1,15 @@
+services:
+  xzy-panel:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - xzy-panel-data:/data
+    environment:
+      PORT: 8080
+      STATE_FILE: /data/panel-state.json
+      MINECRAFT_IMAGE: itzg/minecraft-server:java21
+
+volumes:
+  xzy-panel-data:

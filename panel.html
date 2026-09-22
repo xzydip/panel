@@ -1,0 +1,2037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xzy Panel</title>
+<script>
+  try {
+    const session = JSON.parse(localStorage.getItem('nebula-session') || 'null');
+    if (!session || !session.username) window.location.replace('login.html');
+  } catch {
+    window.location.replace('login.html');
+  }
+</script>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #141b1f;
+    --bg-tertiary: #1a2228;
+    --bg-glass: rgba(20, 27, 31, 0.72);
+    --bg-sidebar: rgba(13, 17, 23, 0.85);
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #5c6773;
+    --border-primary: #262e35;
+    --border-glass: rgba(255, 255, 255, 0.06);
+    --accent-primary: #4dd8e6;
+    --accent-secondary: #6b9eff;
+    --accent-gradient: linear-gradient(135deg, #4dd8e6, #6b9eff);
+    --success: #3fb950;
+    --danger: #f85149;
+    --warning: #d29922;
+    --purple: #a78bfa;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --glass-blur: 12px;
+    --sidebar-width: 250px;
+    --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+  #panelBackground {
+    position: fixed; inset: 0; z-index: -2;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: background 0.4s ease;
+  }
+  #panelBackground::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,var(--panel-overlay, 0));
+    transition: background 0.3s ease;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: -1;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(77, 216, 230, 0.04) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(107, 158, 255, 0.04) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .app { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-sidebar);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    border-right: 1px solid var(--border-glass);
+    padding: 20px 14px;
+    display: flex; flex-direction: column;
+    position: fixed; top: 0; bottom: 0; left: 0;
+    z-index: 40; overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border-primary); border-radius: 2px; }
+
+  .sidebar-brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 8px 18px;
+    border-bottom: 1px solid var(--border-glass);
+    margin-bottom: 16px;
+  }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: var(--radius-sm);
+    background: var(--accent-gradient);
+    display: grid; place-items: center;
+    font-size: 16px; box-shadow: 0 0 24px rgba(77,216,230,0.12);
+    flex-shrink: 0; overflow: hidden;
+  }
+  .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+  .brand-text { font-weight: 700; font-size: 15px; }
+  .brand-text small { display: block; font-weight: 400; font-size: 11px; color: var(--text-muted); }
+
+  .nav-section { margin-bottom: 12px; }
+  .nav-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-muted); padding: 0 10px 8px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: var(--radius-sm);
+    color: var(--text-secondary); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all var(--transition);
+    border: 1px solid transparent; text-decoration: none;
+    margin-bottom: 2px; user-select: none;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+  .nav-item.active {
+    background: rgba(77,216,230,0.1);
+    color: var(--accent-primary);
+    border-color: rgba(77,216,230,0.15);
+  }
+  .nav-item .icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+  .nav-item .chevron {
+    margin-left: auto; font-size: 11px; color: var(--text-muted);
+    transition: transform 0.25s ease; display: flex; align-items: center;
+  }
+  .nav-item.open .chevron { transform: rotate(90deg); color: var(--accent-primary); }
+
+  .submenu {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.2s ease;
+    opacity: 0; padding-left: 12px; margin-left: 14px;
+    border-left: 1px solid var(--border-glass);
+  }
+  .submenu.open { max-height: 400px; opacity: 1; margin-top: 4px; margin-bottom: 6px; }
+  .submenu-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: var(--radius-sm);
+    color: var(--text-secondary); font-size: 12.5px; font-weight: 500;
+    cursor: pointer; transition: all var(--transition);
+    border: 1px solid transparent; text-decoration: none;
+    margin-bottom: 2px;
+  }
+  .submenu-item:hover {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-primary); transform: translateX(2px);
+  }
+  .submenu-item.active {
+    background: rgba(167,139,250,0.1);
+    color: var(--purple);
+    border-color: rgba(167,139,250,0.2);
+  }
+  .submenu-item .sub-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+  .submenu-item::before {
+    content: ''; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--border-primary); flex-shrink: 0;
+    transition: background var(--transition);
+  }
+  .submenu-item:hover::before { background: var(--accent-primary); }
+  .submenu-item.active::before { background: var(--purple); }
+
+  .admin-only { display: none; }
+  .admin-only.visible { display: block; }
+
+  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-glass); }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.03);
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .user-chip:hover { background: rgba(255,255,255,0.07); }
+  .user-avatar-mini {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent-gradient);
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .user-name-mini { font-size: 13px; font-weight: 600; }
+  .user-role-mini { font-size: 11px; color: var(--text-muted); }
+
+  /* Main */
+  .main { flex: 1; margin-left: var(--sidebar-width); padding: 24px 32px; max-width: 1400px; }
+
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .page-header { margin-bottom: 20px; }
+  .page-header h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.03em;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .page-header p { color: var(--text-secondary); font-size: 13.5px; margin-top: 4px; }
+
+  .panel {
+    background: var(--bg-glass);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 20px; margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .panel .desc { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px; }
+
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--bg-glass); backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 14px 16px; transition: all var(--transition);
+  }
+  .stat-card:hover { transform: translateY(-2px); border-color: rgba(77,216,230,0.2); }
+  .stat-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
+  .stat-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+  .stat-value.accent { color: var(--accent-primary); }
+  .stat-value.success { color: var(--success); }
+  .stat-value.purple { color: var(--purple); }
+
+  .btn {
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    padding: 9px 16px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border-primary);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer; transition: all var(--transition);
+    display: inline-flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #222b32; border-color: #333d45; }
+  .btn.primary {
+    background: var(--accent-gradient); border-color: transparent;
+    color: #0d1117; font-weight: 600;
+    box-shadow: 0 2px 12px rgba(77,216,230,0.25);
+  }
+  .btn.primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(77,216,230,0.4); }
+  .btn.danger { background: rgba(248,81,73,0.1); border-color: rgba(248,81,73,0.3); color: var(--danger); }
+  .btn.ghost { background: transparent; }
+  .btn.sm { padding: 6px 12px; font-size: 12px; }
+
+  input[type="text"], input[type="email"], input[type="url"], input[type="number"], input[type="color"], select {
+    width: 100%; font-family: inherit; font-size: 13px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px; color: var(--text-primary);
+    outline: none; transition: all var(--transition);
+  }
+  input:focus, select:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(77,216,230,0.1);
+  }
+  input::placeholder { color: var(--text-muted); }
+  input[type="color"] { height: 46px; padding: 4px; cursor: pointer; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
+
+  input[type="range"] {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 6px; border-radius: 3px; background: var(--bg-primary);
+    border: 1px solid var(--border-primary); outline: none; margin-top: 8px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--accent-gradient);
+    cursor: pointer; box-shadow: 0 0 10px rgba(77,216,230,0.5);
+    border: 2px solid var(--bg-primary);
+  }
+
+  .field { margin-bottom: 16px; }
+  .field-label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }
+  .field-hint { font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.5; }
+  .color-row { display: grid; grid-template-columns: 60px 1fr; gap: 10px; align-items: center; }
+
+  /* URL input with icon */
+  .url-input-row {
+    position: relative;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .url-input-row input { flex: 1; padding-left: 38px; }
+  .url-input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  /* Live logo preview */
+  .logo-live-preview {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    margin-top: 12px;
+  }
+  .logo-live-preview .lp-mark {
+    width: 52px; height: 52px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-gradient);
+    display: grid; place-items: center;
+    font-size: 24px; flex-shrink: 0;
+    overflow: hidden;
+    box-shadow: 0 0 24px rgba(77,216,230,0.15);
+  }
+  .logo-live-preview .lp-mark img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .logo-live-preview .lp-info .lp-name { font-weight: 700; font-size: 15px; }
+  .logo-live-preview .lp-info .lp-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Background preview strip */
+  .bg-preview-strip {
+    margin-top: 12px;
+    height: 100px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-primary);
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .bg-preview-strip::after {
+    content: 'Preview';
+    position: absolute;
+    top: 8px; left: 8px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 10px;
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    transition: all var(--transition);
+  }
+  .toggle-row:hover { border-color: rgba(77,216,230,0.3); }
+  .toggle-row .tgl-label { font-size: 13px; font-weight: 500; }
+  .toggle-row .tgl-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .toggle {
+    position: relative;
+    width: 42px; height: 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--text-muted);
+    top: 2px; left: 2px;
+    transition: all 0.2s ease;
+  }
+  .toggle.on {
+    background: rgba(77,216,230,0.2);
+    border-color: rgba(77,216,230,0.4);
+  }
+  .toggle.on::after {
+    background: var(--accent-primary);
+    left: 20px;
+    box-shadow: 0 0 10px rgba(77,216,230,0.6);
+  }
+
+  .preset-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 8px; margin-top: 8px;
+  }
+  .preset-swatch {
+    aspect-ratio: 16/10;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border-primary);
+    cursor: pointer; transition: all var(--transition);
+    position: relative; overflow: hidden;
+  }
+  .preset-swatch:hover { border-color: var(--accent-primary); transform: translateY(-2px); }
+  .preset-swatch.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(77,216,230,0.25);
+  }
+  .preset-swatch .swatch-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 6px 8px 4px; font-size: 10px; font-weight: 600;
+    color: white; text-align: center;
+  }
+  .bg-p1 { background: linear-gradient(135deg, #0d1117, #16203a); }
+  .bg-p2 { background: linear-gradient(135deg, #0f0a1a, #2a1240); }
+  .bg-p3 { background: linear-gradient(135deg, #0a1410, #103a2a); }
+  .bg-p4 { background: linear-gradient(135deg, #1a0a0a, #3a1010); }
+  .bg-p5 { background: linear-gradient(135deg, #0a0f1a, #102040); }
+  .bg-p6 { background: linear-gradient(135deg, #1a1a1a, #2a2a2a); }
+
+  .user-item {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 12px 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .user-item .info { flex: 1; min-width: 180px; }
+  .user-item .uname { font-weight: 600; font-size: 13.5px; }
+  .user-item .uemail { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .user-item .role {
+    display: inline-flex; padding: 3px 10px;
+    border-radius: 12px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase;
+  }
+  .role.admin { background: rgba(167,139,250,0.15); color: #a78bfa; }
+  .role.user { background: rgba(77,216,230,0.15); color: var(--accent-primary); }
+
+  .server-list { display: grid; gap: 10px; }
+  .server-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: var(--radius-sm); }
+  .server-info { min-width: 0; flex: 1; }
+  .server-name { font-size: 14px; font-weight: 700; }
+  .server-meta { color: var(--text-muted); font-size: 11.5px; margin-top: 4px; }
+  .server-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); margin-top: 7px; }
+  .server-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+  .server-status.online { color: #86efac; }
+  .server-status.online::before { background: var(--success); box-shadow: 0 0 8px rgba(63,185,80,.7); }
+  .server-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .console-output { height: 280px; overflow: auto; padding: 14px; background: #080b0e; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); color: #9fe6a0; font: 12px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+  #consoleModal { padding: 18px; background: rgba(0,0,0,.78); }
+  .console-shell { width: min(1320px, 100%); height: min(820px, 94vh); display: grid; grid-template-columns: 1fr 260px; grid-template-rows: auto 1fr auto; gap: 14px; padding: 20px; overflow: hidden; background: linear-gradient(135deg, rgba(13,17,23,.96), rgba(20,27,31,.9)); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: 0 30px 90px rgba(0,0,0,.7); }
+  .console-top { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .console-server-name { font-size: 20px; font-weight: 700; }
+  .console-server-status { color: var(--success); font-size: 12px; margin-top: 4px; }
+  .console-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .console-terminal { min-height: 0; display: flex; flex-direction: column; background: #090b0f; border: 1px solid #29313a; border-radius: var(--radius-md); overflow: hidden; }
+  .console-output { height: auto; flex: 1; min-height: 0; border: 0; border-radius: 0; padding: 18px; }
+  .console-command { display: flex; gap: 8px; padding: 10px; background: #11161b; border-top: 1px solid #29313a; }
+  .console-command input { flex: 1; min-width: 0; background: #080b0e; border: 1px solid #29313a; color: #e6edf3; padding: 10px 12px; border-radius: var(--radius-sm); font: 12px ui-monospace, monospace; outline: none; }
+  .console-metrics { min-width: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+  .metric-card { position: relative; overflow: hidden; padding: 16px; min-height: 82px; background: rgba(9,11,15,.86); border: 1px solid var(--border-glass); border-radius: var(--radius-md); }
+  .metric-label { color: var(--text-secondary); font-size: 12px; }
+  .metric-value { display: block; margin-top: 8px; color: var(--text-primary); font-size: 18px; font-weight: 700; }
+  .metric-card::after { content: ''; position: absolute; width: 90px; height: 90px; right: -35px; bottom: -45px; border-radius: 50%; background: rgba(77,216,230,.12); }
+  @media (max-width: 760px) { .console-shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(360px, 1fr) auto; overflow: auto; } .console-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .modal-backdrop { position: fixed; inset: 0; display: none; place-items: center; padding: 20px; background: rgba(0,0,0,.7); z-index: 100; }
+  .modal-backdrop.open { display: grid; }
+  .modal { width: min(520px, 100%); max-height: 90vh; overflow: auto; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); padding: 22px; box-shadow: 0 24px 80px rgba(0,0,0,.65); }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .modal-head h2 { font-size: 17px; }
+  .close-btn { border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 20px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .empty-state { padding: 24px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-primary); border-radius: var(--radius-sm); }
+  .user-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .role-select { width: auto !important; min-width: 100px; padding: 7px 10px !important; font-size: 12px !important; }
+  .user-meta { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
+  .user-item { cursor: pointer; }
+  .user-item:hover { border-color: rgba(77,216,230,0.35); }
+  .logout-btn { width: 100%; margin-top: 10px; justify-content: center; color: var(--text-secondary); }
+  .logout-btn:hover { color: var(--danger); border-color: rgba(248,81,73,0.35); }
+  #userModal { align-items: stretch; justify-items: end; padding: 20px 28px 20px 270px; }
+  #userModal .modal { width: min(520px, 100%); max-height: none; height: 100%; transform: translateX(110%); transition: transform .25s ease; }
+  #userModal.open .modal { transform: translateX(0); }
+  @media (max-width: 620px) { .server-item { align-items: flex-start; flex-direction: column; } .server-actions { justify-content: flex-start; } }
+
+  .toast-stack { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 200; }
+  .toast {
+    background: var(--bg-glass); backdrop-filter: blur(16px);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 12px 16px; font-size: 13px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    animation: slideInRight 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toast.ok { border-color: rgba(63,185,80,0.4); color: #86efac; }
+  .toast.err { border-color: rgba(248,81,73,0.4); color: #fca5a5; }
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  @media (max-width: 900px) {
+    .sidebar { transform: translateX(-100%); }
+    .main { margin-left: 0; padding: 16px; }
+    #userModal { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="panelBackground"></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark" id="brandMark">⛏️</div>
+      <div class="brand-text">
+        <span id="brandName">Nebula</span>
+        <small id="brandSub">Panel v1.0</small>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <a class="nav-item" data-page="dashboard" onclick="switchPage('dashboard', this)">
+        <span class="icon">◈</span> <span>Dashboard</span>
+      </a>
+      <a class="nav-item" data-page="servers" onclick="switchPage('servers', this)">
+        <span class="icon">▣</span> <span>Servers</span>
+      </a>
+      <a class="nav-item" data-page="node" onclick="switchPage('node', this)">
+        <span class="icon">◉</span> <span>Node</span>
+      </a>
+    </div>
+
+    <div class="nav-section admin-only" id="adminSection">
+      <div class="nav-label">Admin</div>
+      <div class="nav-item" id="adminSettingsBtn" onclick="toggleAdminMenu()">
+        <span class="icon">⚙</span>
+        <span>Admin Settings</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="submenu" id="adminSubmenu">
+        <div class="submenu-item" data-page="admin-login" onclick="switchPage('admin-login', this)">
+          <span class="sub-icon">🔐</span> <span>Login Page</span>
+        </div>
+        <div class="submenu-item" data-page="admin-panel" onclick="switchPage('admin-panel', this)">
+          <span class="sub-icon">🎨</span> <span>Panel Settings</span>
+        </div>
+        <div class="submenu-item" data-page="admin-node" onclick="switchPage('admin-node', this)">
+          <span class="sub-icon">◉</span> <span>Nodes</span>
+        </div>
+        <div class="submenu-item" data-page="users" onclick="switchPage('users', this)">
+          <span class="sub-icon">👥</span> <span>Users</span>
+        </div>
+        <div class="submenu-item" onclick="openNewUserFromMenu()">
+          <span class="sub-icon">＋</span> <span>New User</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-chip" onclick="openCurrentUserEditor()" title="Edit your account">
+        <div class="user-avatar-mini" id="userAvatar">A</div>
+        <div>
+          <div class="user-name-mini" id="userName">admin</div>
+          <div class="user-role-mini" id="userRole">Administrator</div>
+        </div>
+      </div>
+      <button class="btn ghost logout-btn" onclick="logout()">↪ Logout</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1>◈ Dashboard</h1>
+        <p>Welcome back! Here's an overview of your servers.</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Servers</div><div class="stat-value accent" id="statServers">0</div></div>
+      </div>
+      <div class="panel">
+        <h2>Your Servers</h2>
+        <p class="desc">Servers available to your account</p>
+        <div class="server-list" id="dashboardServerList"></div>
+      </div>
+    </div>
+
+    <!-- SERVERS -->
+    <div class="page" id="page-servers">
+      <div class="page-header">
+        <h1>▣ Servers</h1>
+        <p>Your Minecraft servers</p>
+      </div>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+          <div><h2>My Servers</h2><p class="desc" style="margin-bottom:0;">Create and manage your Minecraft instances</p></div>
+          <button class="btn primary" onclick="openCreateServer()">＋ Create Server</button>
+        </div>
+        <div class="server-list" id="serverList"></div>
+      </div>
+    </div>
+
+    <!-- NODE -->
+    <div class="page" id="page-node">
+      <div class="page-header">
+        <h1>◉ Node</h1>
+        <p>Manage the node connected to this panel.</p>
+      </div>
+      <div class="panel">
+        <h2>Node details</h2>
+        <p class="desc">Nodes configured by the administrator and available for server placement.</p>
+        <div class="server-list" id="nodeOverviewList"></div>
+      </div>
+    </div>
+
+    <!-- ADMIN NODES -->
+    <div class="page" id="page-admin-node">
+      <div class="page-header">
+        <h1>◉ Nodes</h1>
+        <p>Create and manage nodes and their resource allocations.</p>
+      </div>
+      <div class="panel">
+        <h2>Add node</h2>
+        <p class="desc">Set the address and resources available on this node.</p>
+        <form id="nodeForm" onsubmit="createNode(event)">
+          <div class="field"><label class="field-label" for="nodeNameInput">Node name</label><input id="nodeNameInput" placeholder="node-1" required maxlength="32"></div>
+          <div class="field"><label class="field-label" for="nodeAddressInput">Node address</label><input id="nodeAddressInput" placeholder="127.0.0.1" required></div>
+          <div class="field"><label class="field-label" for="nodePortInput">Daemon port</label><input id="nodePortInput" type="number" min="1" max="65535" value="8080" required></div>
+          <div class="field"><label class="field-label" for="nodeRamInput">RAM allocation (GB)</label><input id="nodeRamInput" type="number" min="1" value="8" required></div>
+          <div class="field"><label class="field-label" for="nodeStorageInput">Storage allocation (GB)</label><input id="nodeStorageInput" type="number" min="1" value="100" required></div>
+          <div class="field"><label class="field-label" for="nodeCoresInput">CPU allocation (cores)</label><input id="nodeCoresInput" type="number" min="1" value="4" required></div>
+          <button class="btn primary" type="submit">＋ Create Node</button>
+        </form>
+      </div>
+      <div class="panel"><h2>Configured nodes</h2><p class="desc">Click a node to manage its IP and port allocations.</p><div class="server-list" id="nodeList"></div></div>
+      <div class="panel" id="nodeAllocationsPanel" style="display:none;">
+        <h2 id="nodeAllocationsTitle">Node allocations</h2>
+        <p class="desc">IP and port allocations available for servers on this node.</p>
+        <form id="allocationForm" onsubmit="createAllocation(event)" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <input type="hidden" id="allocationNodeId">
+          <div style="display:flex;gap:8px;flex:1;min-width:240px;"><input class="field-input" id="allocationIpInput" placeholder="IP address" required style="flex:1;min-height:42px;padding:10px 12px;background:#080b0e;color:#e6edf3;border:1px solid #29313a;"><input class="field-input" id="allocationPortInput" type="text" inputmode="numeric" pattern="[0-9]+(-[0-9]+)?" placeholder="Port" required style="width:120px;min-height:42px;padding:10px 12px;background:#080b0e;color:#e6edf3;border:1px solid #29313a;"></div>
+          <input class="field-input" id="allocationLabelInput" placeholder="IP Alias" style="flex:0 0 120px;width:120px;min-height:42px;padding:10px 12px;background:#080b0e;color:#e6edf3;border:1px solid #29313a;">
+          <button class="btn primary" type="submit">＋ Create Allocation</button>
+        </form>
+        <div class="server-list" id="allocationList"></div>
+      </div>
+    </div>
+
+    <!-- LOGIN PAGE CUSTOMIZER -->
+    <div class="page" id="page-admin-login">
+      <div class="page-header">
+        <h1>🔐 Login Page Customizer</h1>
+        <p>Name, logo, background, signup</p>
+      </div>
+
+      <div class="panel">
+        <h2>🏷️ Branding</h2>
+        <p class="desc">Name, logo URL, and background URL shown to new users.</p>
+        <div class="field">
+          <label class="field-label">Panel Name</label>
+          <input type="text" id="loginPanelName" value="Xzy Panel">
+        </div>
+        <div class="field">
+          <label class="field-label">Subtitle</label>
+          <input type="text" id="loginPanelSubtitle" value="Sign in to manage your servers">
+        </div>
+        <div class="field">
+          <label class="field-label">Logo URL</label>
+          <div class="field-hint">Paste a direct PNG, JPG, SVG, or WebP URL.</div>
+          <input type="url" id="loginLogoUrl" placeholder="https://example.com/logo.png">
+        </div>
+        <div class="field">
+          <label class="field-label">Background Image URL</label>
+          <div class="field-hint">Paste a direct wallpaper image URL.</div>
+          <input type="url" id="loginBackgroundUrl" placeholder="https://example.com/background.jpg">
+          <button type="button" class="btn ghost" style="margin-top:10px;" onclick="useProvidedLoginBackground()">🖼 Use Provided Image</button>
+        </div>
+        <div class="toggle-row">
+          <div><div class="tgl-label">Allow new user registration</div><div class="tgl-sub">Show the Create Account option on the login page</div></div>
+          <div class="toggle on" id="loginRegistrationToggle" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+
+      <button class="btn primary" onclick="saveLoginCustomization()">💾 Save Login Customization</button>
+    </div>
+
+    <!-- PANEL SETTINGS (NEW — URL based) -->
+    <div class="page" id="page-admin-panel">
+      <div class="page-header">
+        <h1>🎨 Panel Settings</h1>
+        <p>Customize panel background, name, logo, and theme</p>
+      </div>
+
+      <!-- PANEL IDENTITY -->
+      <div class="panel">
+        <h2>🏷️ Panel Identity</h2>
+        <p class="desc">Name and subtitle shown in sidebar.</p>
+
+        <div class="field">
+          <label class="field-label">Panel Name</label>
+          <input type="text" id="setPanelName" value="Nebula" oninput="liveUpdateName()">
+        </div>
+        <div class="field">
+          <label class="field-label">Subtitle</label>
+          <input type="text" id="setPanelSub" value="Panel v1.0" oninput="liveUpdateName()">
+        </div>
+      </div>
+
+      <!-- PANEL LOGO (URL only) -->
+      <div class="panel">
+        <h2>🖼️ Panel Logo</h2>
+        <p class="desc">Logo from URL, or use an emoji as fallback.</p>
+
+        <div class="field">
+          <label class="field-label">Logo Emoji (fallback)</label>
+          <div class="field-hint">Used when no logo URL is set.</div>
+          <input type="text" id="setLogoEmoji" value="⛏️" maxlength="4"
+                 style="text-align:center;font-size:22px;" oninput="applyLogo()">
+        </div>
+
+        <div class="field">
+          <label class="field-label">Logo Image URL</label>
+          <div class="field-hint">Paste a direct link to a PNG, JPG, SVG, or WebP image.</div>
+          <div class="url-input-row">
+            <span class="url-input-icon">🔗</span>
+            <input type="url" id="setLogoUrl" placeholder="https://example.com/logo.png"
+                   oninput="applyLogo()">
+          </div>
+        </div>
+
+        <!-- Live logo preview -->
+        <div class="logo-live-preview">
+          <div class="lp-mark" id="logoPreviewMark">⛏️</div>
+          <div class="lp-info">
+            <div class="lp-name" id="logoPreviewName">Nebula</div>
+            <div class="lp-sub" id="logoPreviewSub">Panel v1.0</div>
+          </div>
+        </div>
+
+        <button class="btn ghost" style="margin-top:10px;" onclick="clearLogo()">
+          🗑 Clear Logo URL
+        </button>
+      </div>
+
+      <!-- PANEL BACKGROUND -->
+      <div class="panel">
+        <h2>🖼️ Panel Background</h2>
+        <p class="desc">Background for the entire panel (all pages).</p>
+
+        <div class="field">
+          <label class="field-label">Background Type</label>
+          <select id="setBgType" onchange="onBgTypeChange()">
+            <option value="preset" selected>Preset</option>
+            <option value="solid">Solid Color</option>
+            <option value="gradient">Gradient</option>
+            <option value="image">Image URL</option>
+          </select>
+        </div>
+
+        <!-- Preset -->
+        <div id="bgPresetGroup">
+          <label class="field-label">Preset Backgrounds</label>
+          <div class="preset-grid">
+            <div class="preset-swatch bg-p1 active" data-bg="1" onclick="pickPreset(1)">
+              <div class="swatch-label">Nebula Dark</div>
+            </div>
+            <div class="preset-swatch bg-p2" data-bg="2" onclick="pickPreset(2)">
+              <div class="swatch-label">Cosmic Purple</div>
+            </div>
+            <div class="preset-swatch bg-p3" data-bg="3" onclick="pickPreset(3)">
+              <div class="swatch-label">Deep Forest</div>
+            </div>
+            <div class="preset-swatch bg-p4" data-bg="4" onclick="pickPreset(4)">
+              <div class="swatch-label">Crimson</div>
+            </div>
+            <div class="preset-swatch bg-p5" data-bg="5" onclick="pickPreset(5)">
+              <div class="swatch-label">Ocean Blue</div>
+            </div>
+            <div class="preset-swatch bg-p6" data-bg="6" onclick="pickPreset(6)">
+              <div class="swatch-label">Graphite</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Solid -->
+        <div id="bgSolidGroup" style="display:none;">
+          <label class="field-label">Solid Color</label>
+          <div class="color-row">
+            <input type="color" id="setBgSolid" value="#0d1117" oninput="applyBg()">
+            <input type="text" id="setBgSolidHex" value="#0D1117"
+                   oninput="document.getElementById('setBgSolid').value = this.value; applyBg();">
+          </div>
+        </div>
+
+        <!-- Gradient -->
+        <div id="bgGradientGroup" style="display:none;">
+          <label class="field-label">Gradient Colors</label>
+          <div class="color-row" style="margin-bottom:8px;">
+            <input type="color" id="setBgG1" value="#0d1117" oninput="applyBg()">
+            <input type="text" id="setBgG1Hex" value="#0D1117"
+                   oninput="document.getElementById('setBgG1').value = this.value; applyBg();">
+          </div>
+          <div class="color-row">
+            <input type="color" id="setBgG2" value="#16203a" oninput="applyBg()">
+            <input type="text" id="setBgG2Hex" value="#16203A"
+                   oninput="document.getElementById('setBgG2').value = this.value; applyBg();">
+          </div>
+          <label class="field-label" style="margin-top:14px;">Direction</label>
+          <select id="setBgDir" onchange="applyBg()">
+            <option value="135deg">Diagonal ↘</option>
+            <option value="45deg">Diagonal ↗</option>
+            <option value="180deg">Top → Bottom ↓</option>
+            <option value="90deg">Left → Right →</option>
+          </select>
+        </div>
+
+        <!-- Image URL (NO upload) -->
+        <div id="bgImageGroup" style="display:none;">
+          <div class="field">
+            <label class="field-label">Background Image URL</label>
+            <div class="field-hint">Paste a direct link to a PNG, JPG, or WebP image.</div>
+            <div class="url-input-row">
+              <span class="url-input-icon">🔗</span>
+              <input type="url" id="setBgUrl" placeholder="https://example.com/background.jpg"
+                     oninput="applyBg()">
+            </div>
+          </div>
+
+          <!-- Live bg preview -->
+          <div class="bg-preview-strip" id="bgPreviewStrip"></div>
+        </div>
+
+        <!-- Overlay -->
+        <div class="field" style="margin-top:16px;">
+          <label class="field-label">
+            Overlay Darkness — <span id="overlayVal">30%</span>
+          </label>
+          <div class="field-hint">Darken background so content stays readable.</div>
+          <input type="range" id="setBgOverlay" min="0" max="90" value="30"
+                 oninput="document.getElementById('overlayVal').textContent = this.value + '%'; applyBg();">
+        </div>
+
+        <button class="btn ghost" onclick="resetBg()">↺ Reset Background</button>
+      </div>
+
+      <!-- ACCENT COLORS -->
+      <div class="panel">
+        <h2>🎨 Accent Colors</h2>
+        <p class="desc">Drives buttons, highlights, and gradients.</p>
+
+        <div class="field">
+          <label class="field-label">Accent Primary</label>
+          <div class="color-row">
+            <input type="color" id="setAccent1" value="#4dd8e6" oninput="applyAccent()">
+            <input type="text" id="setAccent1Hex" value="#4DD8E6"
+                   oninput="document.getElementById('setAccent1').value = this.value; applyAccent();">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Accent Secondary</label>
+          <div class="color-row">
+            <input type="color" id="setAccent2" value="#6b9eff" oninput="applyAccent()">
+            <input type="text" id="setAccent2Hex" value="#6B9EFF"
+                   oninput="document.getElementById('setAccent2').value = this.value; applyAccent();">
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVE BAR -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:20px;padding:14px;background:var(--bg-glass);backdrop-filter:blur(var(--glass-blur));border:1px solid var(--border-glass);border-radius:var(--radius-md);box-shadow:0 20px 50px rgba(0,0,0,0.5);z-index:30;">
+        <span style="flex:1;font-size:12.5px;color:var(--text-muted);display:flex;align-items:center;">Changes apply live — click Save to persist.</span>
+        <button class="btn ghost" onclick="resetAll()">↺ Reset All</button>
+        <button class="btn primary" onclick="saveAll()">💾 Save Changes</button>
+      </div>
+    </div>
+
+    <!-- NEW USER -->
+    <div class="page" id="page-new-user">
+      <div class="page-header">
+        <h1>＋ New User</h1>
+        <p>Create a panel account and configure its server resources</p>
+      </div>
+      <div class="panel">
+        <h2>Panel account details</h2>
+        <p class="desc">Admin-only: create a panel login and set its server permissions.</p>
+        <form id="newUserPageForm" onsubmit="createUserFromPage(event)">
+          <div class="toggle-row"><div><div class="tgl-label">Allow server creation</div><div class="tgl-sub">User can create Minecraft servers</div></div><div class="toggle on" id="pageCanCreate" onclick="toggleSwitch(this)"></div></div>
+          <div class="field"><label class="field-label" for="pageServerLimit">Maximum servers</label><input type="number" id="pageServerLimit" min="0" max="100" value="2"></div>
+          <div class="field"><label class="field-label" for="pageRamLimit">Maximum RAM (GB)</label><input type="number" id="pageRamLimit" min="1" max="1024" value="8"></div>
+          <div class="field"><label class="field-label" for="pageStorageLimit">Maximum storage (GB)</label><input type="number" id="pageStorageLimit" min="1" max="10000" value="100"></div>
+          <div class="field"><label class="field-label" for="pageCoresLimit">Maximum CPU cores</label><input type="number" id="pageCoresLimit" min="1" max="128" value="4"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;"><button type="button" class="btn ghost" onclick="switchPage('users', document.querySelector('[data-page=users]'))">Cancel</button><button type="submit" class="btn primary">Create User</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <h1>👥 Users</h1>
+        <p>Manage panel users and roles</p>
+      </div>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+          <div>
+            <h2>All Users</h2>
+            <p class="desc" id="userCount" style="margin-bottom:0;">0 users registered</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="refreshLivePanelData()">↻ Refresh</button><button class="btn danger" onclick="deleteOtherUsers()">Delete Users Except xzydip</button><button class="btn danger" onclick="deleteAllUsers()">Delete All Accounts</button><button class="btn primary" onclick="openNewUserPage()">＋ New User</button></div>
+        </div>
+        <div id="usersList"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast-stack" id="toasts"></div>
+
+<div class="modal-backdrop" id="serverModal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal">
+    <div class="modal-head"><h2>Create Minecraft Server</h2><button class="close-btn" aria-label="Close" onclick="closeServerModal()">×</button></div>
+    <form id="serverForm" onsubmit="createServer(event)">
+      <div class="field"><label class="field-label" for="serverNameInput">Server name</label><input type="text" id="serverNameInput" placeholder="survival" required maxlength="24"></div>
+      <div class="field"><label class="field-label" for="serverVersionInput">Minecraft version</label><select id="serverVersionInput"><option>1.21.1</option><option>1.20.1</option><option>1.19.4</option></select></div>
+      <div class="field"><label class="field-label" for="serverJavaInput">Java version</label><select id="serverJavaInput"><option value="Java 21">Java 21</option><option value="Java 17">Java 17</option><option value="Java 11">Java 11</option><option value="Java 8">Java 8</option></select></div>
+      <div class="field"><label class="field-label" for="serverOwnerInput">Server user</label><select id="serverOwnerInput"></select></div>
+      <div class="field"><label class="field-label" for="serverNodeInput">Node</label><select id="serverNodeInput" onchange="updateServerAllocationOptions()"><option value="">Select a node</option></select></div>
+      <div class="field"><label class="field-label" for="serverAllocationInput">IP allocation</label><select id="serverAllocationInput"><option value="">Select an allocation</option></select></div>
+      <div class="toggle-row"><div><div class="tgl-label">Run in Docker</div><div class="tgl-sub">Save this server with a Docker runtime</div></div><div class="toggle on" id="serverDockerToggle" onclick="toggleSwitch(this)"></div></div>
+      <div class="field"><label class="field-label" for="serverMemoryInput">RAM allocation</label><select id="serverMemoryInput"><option value="1 GB">1 GB</option><option value="2 GB">2 GB</option><option value="4 GB">4 GB</option><option value="8 GB">8 GB</option></select></div>
+      <div class="field"><label class="field-label" for="serverStorageInput">Storage</label><select id="serverStorageInput"><option value="10 GB">10 GB</option><option value="25 GB">25 GB</option><option value="50 GB">50 GB</option><option value="100 GB">100 GB</option></select></div>
+      <div class="field"><label class="field-label" for="serverCoresInput">CPU cores</label><select id="serverCoresInput"><option value="1">1 core</option><option value="2">2 cores</option><option value="4">4 cores</option><option value="8">8 cores</option></select></div>
+      <div class="modal-actions"><button type="button" class="btn ghost" onclick="closeServerModal()">Cancel</button><button type="submit" class="btn primary">Create Server</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="consoleModal" onclick="closeModalOnBackdrop(event)">
+  <div class="console-shell">
+    <div class="console-top"><div><div class="console-server-name" id="consoleTitle">Server Console</div><div class="console-server-status" id="consoleStatus">● Online</div></div><div class="console-controls"><button class="btn" onclick="restartCurrentServer()">↻ Restart</button><button class="btn danger" onclick="stopCurrentServer()">■ Stop</button><button class="btn danger" onclick="forceStopCurrentServer()">⚠ Force Stop</button><button class="close-btn" aria-label="Close" onclick="closeConsole()">×</button></div></div>
+    <div class="console-terminal"><div class="console-output" id="consoleOutput"></div><form class="console-command" onsubmit="sendConsoleCommand(event)"><input id="consoleCommandInput" placeholder="Type a server command..." autocomplete="off"><button class="btn sm primary" type="submit">Send</button></form></div>
+    <div class="console-metrics"><div class="metric-card"><span class="metric-label">Address</span><span class="metric-value" id="metricAddress">localhost</span></div><div class="metric-card"><span class="metric-label">Uptime</span><span class="metric-value" id="metricUptime">Just started</span></div><div class="metric-card"><span class="metric-label">CPU Usage</span><span class="metric-value" id="metricCpu">0% / 0 cores</span></div><div class="metric-card"><span class="metric-label">RAM Usage</span><span class="metric-value" id="metricMemory">0 GB / 0 GB</span></div><div class="metric-card"><span class="metric-label">Storage Usage</span><span class="metric-value" id="metricDisk">0 MiB / 0 GB</span></div><div class="metric-card"><span class="metric-label">Network</span><span class="metric-value" id="metricNetwork">0 MiB</span></div></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="userModal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal">
+    <div class="modal-head"><h2 id="userModalTitle">Edit User</h2><button class="close-btn" aria-label="Close" onclick="closeUserModal()">×</button></div>
+    <form id="userForm" onsubmit="saveEditedUser(event)">
+      <div class="field"><label class="field-label" for="editUsername">Username</label><input type="text" id="editUsername" required maxlength="24"></div>
+      <div class="field"><label class="field-label" for="editEmail">Email</label><input type="email" id="editEmail" required></div>
+      <div class="field"><label class="field-label" for="editPassword">New Password</label><input type="password" id="editPassword" minlength="8" placeholder="Enter a new password" autocomplete="new-password"></div>
+      <div class="field" style="display:none"><label class="field-label" for="editRole">Role</label><select id="editRole"><option value="admin">Admin</option><option value="user">User</option></select></div>
+      <div class="toggle-row" style="display:none"><div><div class="tgl-label">Allow server creation</div><div class="tgl-sub">User can create Minecraft servers</div></div><div class="toggle on" id="editCanCreate" onclick="toggleSwitch(this)"></div></div>
+      <div class="field" style="display:none"><label class="field-label" for="editServerLimit">Maximum servers</label><input type="number" id="editServerLimit" min="0" max="100" value="2"></div>
+      <div class="field" style="display:none"><label class="field-label" for="editRamLimit">Maximum RAM (GB)</label><input type="number" id="editRamLimit" min="1" max="1024" value="8"></div>
+      <div class="field" style="display:none"><label class="field-label" for="editStorageLimit">Maximum storage (GB)</label><input type="number" id="editStorageLimit" min="1" max="10000" value="100"></div>
+      <div class="field" style="display:none"><label class="field-label" for="editCoresLimit">Maximum CPU cores</label><input type="number" id="editCoresLimit" min="1" max="128" value="4"></div>
+      <div class="modal-actions"><button type="button" class="btn ghost" onclick="closeUserModal()">Cancel</button><button type="submit" class="btn primary">Save User</button></div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // ROLE MANAGEMENT
+  // ============================================================
+  let currentRole = 'admin';
+
+  function setRole(role, announce = false) {
+    const session = getPanelUsers().find(user => user.username === getCurrentUsername());
+    role = session && session.role === 'admin' ? 'admin' : 'user';
+    currentRole = role;
+    document.getElementById('adminSection').classList.toggle('visible', role === 'admin');
+
+    const username = session ? session.username : 'user';
+    document.getElementById('userAvatar').textContent = username.charAt(0).toUpperCase();
+    document.getElementById('userName').textContent = username;
+    document.getElementById('userRole').textContent = role === 'admin' ? 'Administrator' : 'Normal User';
+
+    if (role === 'user') {
+      const cur = document.querySelector('.page.active');
+      if (cur && cur.id.match(/^page-(admin-|users)/)) {
+        switchPage('dashboard', document.querySelector('[data-page=dashboard]'));
+      }
+    }
+    if (announce) toast(role === 'admin' ? 'Administrator account' : 'Normal user account', 'ok');
+  }
+
+  function updateCurrentUserPresence() {
+    const username = getCurrentUsername();
+    if (!username) return;
+    const users = getPanelUsers();
+    const user = users.find(item => item.username === username);
+    if (!user) return;
+    user.lastSeen = Date.now();
+    savePanelUsers(users);
+  }
+
+  function logout() {
+    const username = getCurrentUsername();
+    const users = getPanelUsers();
+    const user = users.find(item => item.username === username);
+    if (user) { delete user.lastSeen; savePanelUsers(users); }
+    localStorage.removeItem('nebula-session');
+    window.location.replace('login.html');
+  }
+
+  // ============================================================
+  // ADMIN MENU ACCORDION
+  // ============================================================
+  let adminOpen = false;
+  function toggleAdminMenu(force) {
+    const btn = document.getElementById('adminSettingsBtn');
+    const sub = document.getElementById('adminSubmenu');
+    adminOpen = typeof force === 'boolean' ? force : !adminOpen;
+    btn.classList.toggle('open', adminOpen);
+    sub.classList.toggle('open', adminOpen);
+  }
+
+  // ============================================================
+  // PAGE SWITCHING
+  // ============================================================
+  function switchPage(pageId, el) {
+    if (currentRole === 'user' && /^admin-|^users$|^new-user$/.test(pageId)) {
+      toast('Admin only', 'err'); return;
+    }
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const t = document.getElementById('page-' + pageId);
+    if (t) t.classList.add('active');
+
+    document.querySelectorAll('.nav-item, .submenu-item').forEach(n => n.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    if (pageId.startsWith('admin-') || pageId === 'users' || pageId === 'new-user') {
+      document.getElementById('adminSettingsBtn').classList.add('active');
+    }
+    if (pageId === 'users') renderUsers();
+    if (pageId === 'admin-node') renderNodes();
+    if (pageId === 'node') renderNodeOverview();
+    if (pageId === 'admin-login') loadLoginCustomization();
+    window.scrollTo(0, 0);
+  }
+
+  function loadLoginCustomization() {
+    const panelSettings = getSettings();
+    let savedLogin = {};
+    try { savedLogin = JSON.parse(localStorage.getItem(LOGIN_SETTINGS_KEY) || '{}'); } catch {}
+    const settings = { ...panelSettings, ...savedLogin };
+    document.getElementById('loginPanelName').value = settings.panelName;
+    document.getElementById('loginPanelSubtitle').value = settings.loginSubtitle || 'Sign in to manage your servers';
+    document.getElementById('loginLogoUrl').value = settings.loginLogoUrl || '';
+    document.getElementById('loginBackgroundUrl').value = settings.loginBackgroundUrl || '';
+    document.getElementById('loginRegistrationToggle').classList.toggle('on', settings.allowSignup !== false);
+  }
+
+  function saveLoginCustomization() {
+    const settings = getSettings();
+    const loginSettings = {
+      panelName: document.getElementById('loginPanelName').value.trim() || 'Nebula',
+      loginSubtitle: document.getElementById('loginPanelSubtitle').value.trim() || 'Sign in to manage your servers',
+      loginLogoUrl: document.getElementById('loginLogoUrl').value.trim(),
+      loginBackgroundUrl: document.getElementById('loginBackgroundUrl').value.trim(),
+      allowSignup: document.getElementById('loginRegistrationToggle').classList.contains('on')
+    };
+    localStorage.setItem(LOGIN_SETTINGS_KEY, JSON.stringify(loginSettings));
+    Object.assign(settings, loginSettings);
+    saveSettings(settings);
+    loadSettings();
+    toast('Login branding saved', 'ok');
+  }
+
+  function useProvidedLoginBackground() {
+    document.getElementById('loginBackgroundUrl').value = 'https://cdn.discordapp.com/attachments/1543220832044585082/1551946468695216210/Screenshot_20260922-185055_Discord.png?ex=6ab3d247&is=6ab280c7&hm=af553c49cce9711e29415472117c2389661f28f9c29b605007faaa604323b471&';
+    toast('Provided image selected. Click Save Login Customization.', 'ok');
+  }
+
+  // ============================================================
+  // USER MANAGEMENT
+  // ============================================================
+  function getPanelUsers() {
+    try {
+      const users = JSON.parse(localStorage.getItem('nebula-users') || '[]');
+      if (!Array.isArray(users)) return [];
+      let changed = false;
+      users.forEach(user => {
+        if (user.role === 'viewer' || !['admin', 'user'].includes(user.role)) {
+          user.role = 'user';
+          changed = true;
+        }
+        if (String(user.username).toLowerCase() === 'xzydip' && user.role !== 'admin') {
+          user.role = 'admin';
+          changed = true;
+        }
+        const defaults = { canCreate: true, serverLimit: 2, ramLimit: 8, storageLimit: 100, coresLimit: 4 };
+        Object.keys(defaults).forEach(key => {
+          if (user[key] === undefined) { user[key] = defaults[key]; changed = true; }
+        });
+      });
+      if (changed) savePanelUsers(users);
+      return users;
+    } catch { return []; }
+  }
+
+  function savePanelUsers(users) { localStorage.setItem('nebula-users', JSON.stringify(users)); }
+
+  async function syncRemotePanelUsers() {
+    try {
+      const response = await fetch(`${BACKEND_API}/users`);
+      if (!response.ok) return;
+      const remoteUsers = await response.json();
+      if (Array.isArray(remoteUsers) && remoteUsers.length) {
+        savePanelUsers(remoteUsers);
+        renderUsers();
+      }
+    } catch {}
+  }
+
+  async function getPanelIp() {
+    const providers = [
+      'https://api.ipify.org?format=json',
+      'https://api64.ipify.org?format=json',
+      'https://ipapi.co/json/'
+    ];
+    for (const url of providers) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
+        const data = await response.json();
+        if (response.ok && data.ip) return data.ip;
+      } catch {}
+      finally { clearTimeout(timeout); }
+    }
+    return 'Unavailable';
+  }
+
+  let editingUsername = '';
+  let isCreatingUser = false;
+
+  function openNewUserFromMenu() {
+    openNewUserPage();
+  }
+
+  function openNewUserPage() {
+    if (currentRole !== 'admin') { toast('Only administrators can create panel accounts', 'err'); return; }
+    switchPage('new-user');
+    document.getElementById('newUserPageForm').reset();
+    document.getElementById('pageCanCreate').classList.add('on');
+    document.getElementById('pageServerLimit').value = 2;
+    document.getElementById('pageRamLimit').value = 8;
+    document.getElementById('pageStorageLimit').value = 100;
+    document.getElementById('pageCoresLimit').value = 4;
+  }
+
+  async function createUserFromPage(event) {
+    event.preventDefault();
+    const users = getPanelUsers();
+    const username = `user-${Date.now().toString(36)}`;
+    const email = `${username}@local.panel`;
+    const password = `Temp-${Math.random().toString(36).slice(2, 10)}!`;
+    if (!/^[a-zA-Z0-9_-]{3,24}$/.test(username)) { toast('Invalid username', 'err'); return; }
+    if (users.some(user => user.username.toLowerCase() === username.toLowerCase())) { toast('Username already exists', 'err'); return; }
+    if (users.some(user => user.email.toLowerCase() === email.toLowerCase())) { toast('Email already registered', 'err'); return; }
+    const newUser = {
+      username, email, password,
+      role: 'user',
+      canCreate: document.getElementById('pageCanCreate').classList.contains('on'),
+      serverLimit: Number(document.getElementById('pageServerLimit').value),
+      ramLimit: Number(document.getElementById('pageRamLimit').value),
+      storageLimit: Number(document.getElementById('pageStorageLimit').value),
+      coresLimit: Number(document.getElementById('pageCoresLimit').value),
+      ip: await getPanelIp(),
+      createdAt: Date.now()
+    };
+    if ([newUser.serverLimit, newUser.ramLimit, newUser.storageLimit, newUser.coresLimit].some(value => !Number.isFinite(value) || value < 0)) { toast('Resource limits must be valid', 'err'); return; }
+    users.push(newUser);
+    savePanelUsers(users);
+    renderUsers();
+    toast(`${username} created. Temporary password: ${password}`, 'ok');
+    switchPage('users', document.querySelector('[data-page=users]'));
+  }
+
+  function openNewUser() {
+    isCreatingUser = true;
+    editingUsername = '';
+    document.getElementById('userModalTitle').textContent = 'New User';
+    document.getElementById('userForm').reset();
+    document.getElementById('editUsername').readOnly = false;
+    document.getElementById('editCanCreate').classList.add('on');
+    document.getElementById('editServerLimit').value = 2;
+    document.getElementById('editRamLimit').value = 8;
+    document.getElementById('editStorageLimit').value = 100;
+    document.getElementById('editCoresLimit').value = 4;
+    document.getElementById('editRole').value = 'user';
+    document.getElementById('userModal').classList.add('open');
+    document.getElementById('editUsername').focus();
+  }
+
+  function openEditUser(username) {
+    const user = getPanelUsers().find(item => item.username === username);
+    if (!user) return;
+    isCreatingUser = false;
+    editingUsername = username;
+    setEditPermissionsVisible(true);
+    document.getElementById('userModalTitle').textContent = 'Edit User';
+    document.getElementById('editUsername').value = user.username;
+    document.getElementById('editUsername').readOnly = false;
+    document.getElementById('editEmail').value = user.email;
+    document.getElementById('editPassword').value = '';
+    document.getElementById('editRole').value = user.role || 'user';
+    document.getElementById('editCanCreate').classList.toggle('on', user.canCreate !== false);
+    document.getElementById('editServerLimit').value = user.serverLimit ?? 2;
+    document.getElementById('editRamLimit').value = user.ramLimit ?? 8;
+    document.getElementById('editStorageLimit').value = user.storageLimit ?? 100;
+    document.getElementById('editCoresLimit').value = user.coresLimit ?? 4;
+    document.getElementById('userModal').classList.add('open');
+  }
+
+  function openCurrentUserEditor() {
+    const username = getCurrentUsername();
+    if (!username) return;
+    openEditUser(username);
+    setEditPermissionsVisible(false);
+    document.getElementById('editPassword').parentElement.style.display = 'block';
+    document.getElementById('editUsername').readOnly = true;
+    document.getElementById('userModalTitle').textContent = 'Edit My Account';
+  }
+
+  function setEditPermissionsVisible(visible) {
+    ['editRole', 'editCanCreate', 'editServerLimit', 'editRamLimit', 'editStorageLimit', 'editCoresLimit'].forEach(id => {
+      const field = document.getElementById(id);
+      if (field && field.parentElement) field.parentElement.style.display = visible ? (id === 'editCanCreate' ? 'flex' : 'block') : 'none';
+    });
+  }
+
+  function closeUserModal() {
+    document.getElementById('userModal').classList.remove('open');
+    editingUsername = '';
+    isCreatingUser = false;
+  }
+
+  async function saveEditedUser(event) {
+    event.preventDefault();
+    const creating = isCreatingUser;
+    const users = getPanelUsers();
+    const username = document.getElementById('editUsername').value.trim();
+    const email = document.getElementById('editEmail').value.trim();
+    const password = document.getElementById('editPassword').value;
+    if (!/^[a-zA-Z0-9_-]{3,24}$/.test(username)) { toast('Invalid username', 'err'); return; }
+    if (users.some(item => item.username !== editingUsername && item.username.toLowerCase() === username.toLowerCase())) { toast('Username already exists', 'err'); return; }
+    if (users.some(item => item.username !== editingUsername && item.email.toLowerCase() === email.toLowerCase())) {
+      toast('Email already registered', 'err');
+      return;
+    }
+    if ((isCreatingUser && password.length < 8) || (password && password.length < 8)) {
+      toast('Password must be at least 8 characters', 'err');
+      return;
+    }
+    const userSettings = {
+      role: document.getElementById('editRole').value,
+      canCreate: document.getElementById('editCanCreate').classList.contains('on'),
+      serverLimit: Number(document.getElementById('editServerLimit').value),
+      ramLimit: Number(document.getElementById('editRamLimit').value),
+      storageLimit: Number(document.getElementById('editStorageLimit').value),
+      coresLimit: Number(document.getElementById('editCoresLimit').value)
+    };
+    if (Object.values(userSettings).some(value => typeof value === 'number' && (!Number.isFinite(value) || value < 0))) { toast('Resource limits must be valid', 'err'); return; }
+    let user = users.find(item => item.username === editingUsername);
+    if (creating) {
+      user = { username, email, password, ip: await getPanelIp(), createdAt: Date.now(), ...userSettings };
+      users.push(user);
+    } else {
+      if (!user) return;
+      user.username = username;
+      user.email = email;
+      Object.assign(user, userSettings);
+      if (password) user.password = password;
+    }
+    savePanelUsers(users);
+    if (getCurrentUsername() === editingUsername) {
+      updateCurrentSessionRole(user.role);
+      try {
+        const session = JSON.parse(localStorage.getItem('nebula-session') || '{}');
+        session.username = user.username;
+        session.email = user.email;
+        localStorage.setItem('nebula-session', JSON.stringify(session));
+      } catch {}
+    }
+    renderUsers();
+    closeUserModal();
+    toast(`${user.username} ${creating ? 'created' : 'updated'}`, 'ok');
+  }
+
+  function renderUsers() {
+    const users = getPanelUsers();
+    const list = document.getElementById('usersList');
+    const count = document.getElementById('userCount');
+    if (!list || !count) return;
+    count.textContent = `${users.length} user${users.length === 1 ? '' : 's'} registered`;
+    list.innerHTML = users.length ? users.map(user => {
+      const role = user.role || 'user';
+      const created = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown date';
+      const online = user.lastSeen && Date.now() - user.lastSeen < 60000;
+      return `<div class="user-item" onclick="openEditUser('${escapeHtml(user.username)}')">
+        <div class="info"><div class="uname">${role === 'admin' ? '👑' : '👤'} ${escapeHtml(user.username)}</div>
+        <div class="uemail">${escapeHtml(user.email)}</div><div class="user-meta">${online ? '● Online' : '○ Offline'} · Registered: ${created} · IP: ${escapeHtml(user.ip || 'Unavailable')} · ${user.canCreate === false ? 'Server creation off' : `${user.serverLimit ?? 2} server(s), ${user.ramLimit ?? 8} GB RAM, ${user.storageLimit ?? 100} GB storage, ${user.coresLimit ?? 4} cores`}</div></div>
+        <div class="user-actions" onclick="event.stopPropagation()"><select class="role-select" aria-label="Role for ${escapeHtml(user.username)}" onchange="changeUserRole('${escapeHtml(user.username)}', this.value)">
+          <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option><option value="user" ${role === 'user' ? 'selected' : ''}>User</option>
+        </select><button class="btn sm danger" onclick="deleteUser('${escapeHtml(user.username)}')">Delete</button></div>
+      </div>`;
+    }).join('') : '<div class="empty-state">No registered users yet.</div>';
+  }
+
+  function changeUserRole(username, role) {
+    if (!['admin', 'user'].includes(role)) return;
+    const users = getPanelUsers();
+    const user = users.find(item => item.username === username);
+    if (!user) return;
+    user.role = role;
+    savePanelUsers(users);
+    toast(`${username} is now ${role}`, 'ok');
+    if (getCurrentUsername() === username) updateCurrentSessionRole(role);
+    renderUsers();
+  }
+
+  function deleteUser(username) {
+    const session = getCurrentUsername();
+    if (username === session) { toast('You cannot delete your own account', 'err'); return; }
+    if (!confirm(`Delete user ${username}?`)) return;
+    const users = getPanelUsers().filter(user => user.username !== username);
+    savePanelUsers(users);
+    renderUsers();
+    toast(`${username} deleted`, 'ok');
+  }
+
+  async function deleteOtherUsers() {
+    const users = getPanelUsers();
+    const keepUsername = 'xzydip';
+    const otherUsers = users.filter(user => String(user.username).toLowerCase() !== keepUsername);
+    if (!otherUsers.length) { toast('No other users to delete', 'ok'); return; }
+    if (!confirm(`Delete ${otherUsers.length} user account(s)? xzydip will be kept.`)) return;
+    const keptUsers = users.filter(user => String(user.username).toLowerCase() === keepUsername);
+    savePanelUsers(keptUsers);
+    try { await fetch(`${BACKEND_API}/users/except/${keepUsername}`, { method: 'DELETE' }); } catch {}
+    renderUsers();
+    toast('All users except xzydip deleted', 'ok');
+  }
+
+  function deleteAllUsers() {
+    if (!confirm('Delete every registered account, including your current account?')) return;
+    localStorage.removeItem('nebula-users');
+    localStorage.removeItem('nebula-session');
+    window.location.replace('login.html');
+  }
+
+  function getCurrentUsername() {
+    try { return JSON.parse(localStorage.getItem('nebula-session') || '{}').username || ''; }
+    catch { return ''; }
+  }
+
+  function updateCurrentSessionRole(role) {
+    try {
+      const session = JSON.parse(localStorage.getItem('nebula-session') || '{}');
+      session.role = role;
+      localStorage.setItem('nebula-session', JSON.stringify(session));
+    } catch {}
+  }
+
+  function refreshLivePanelData() {
+    renderUsers();
+    setRole(currentRole);
+    renderServers();
+    renderNodes();
+    renderNodeOverview();
+  }
+
+  window.addEventListener('storage', event => {
+    if (event.key === 'nebula-users' || event.key === 'nebula-session' || event.key === SERVERS_KEY || event.key === NODES_KEY) {
+      refreshLivePanelData();
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshLivePanelData();
+  });
+  window.addEventListener('focus', refreshLivePanelData);
+  window.addEventListener('pageshow', refreshLivePanelData);
+
+  // ============================================================
+  // SERVER DEMO CONTROLS
+  // ============================================================
+  const SERVERS_KEY = 'nebula-panel-servers';
+  let currentServerId = null;
+  let servers = loadServers();
+
+  function loadServers() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SERVERS_KEY));
+      if (Array.isArray(saved)) {
+        const normalized = saved.map(server => ({ ...server, owner: server.owner || 'admin', storage: server.storage || 25, cores: server.cores || 2, java: server.java || 'Java 21', docker: server.docker !== false }));
+        if (JSON.stringify(normalized) !== JSON.stringify(saved)) localStorage.setItem(SERVERS_KEY, JSON.stringify(normalized));
+        return normalized;
+      }
+    } catch {}
+    return [];
+  }
+
+  function saveServers() { localStorage.setItem(SERVERS_KEY, JSON.stringify(servers)); }
+  const BACKEND_API = window.location.port === '8080' ? '/api' : 'http://localhost:8080/api';
+  async function backendRequest(path, options = {}) {
+    try {
+      const response = await fetch(`${BACKEND_API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...options });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Backend request failed');
+      return data;
+    } catch (error) {
+      console.warn('Docker backend unavailable:', error.message);
+      return null;
+    }
+  }
+
+  const NODES_KEY = 'nebula-panel-nodes';
+  let nodes = loadNodes();
+
+  function loadNodes() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(NODES_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch { return []; }
+  }
+
+  function saveNodes() { localStorage.setItem(NODES_KEY, JSON.stringify(nodes)); }
+
+  function renderNodes() {
+    const list = document.getElementById('nodeList');
+    if (!list) return;
+    list.innerHTML = nodes.length ? nodes.map(node => `<div class="server-item" style="cursor:pointer" onclick="openNodeAllocations('${node.id}')">
+      <div class="server-info"><div class="server-name">${escapeHtml(node.name)}</div>
+      <div class="server-meta">${escapeHtml(node.address)}:${node.port} · ${node.ram} GB RAM · ${node.storage} GB storage · ${node.cores} CPU cores</div>
+      <div class="server-status ${node.status === 'online' ? 'online' : ''}">${node.status === 'online' ? 'Online' : 'Offline'}</div></div>
+      <div class="server-actions"><button class="btn sm" onclick="event.stopPropagation();toggleNode('${node.id}')">${node.status === 'online' ? 'Disable' : 'Enable'}</button><button class="btn sm danger" onclick="event.stopPropagation();deleteNode('${node.id}')">Delete</button></div>
+    </div>`).join('') : '<div class="empty-state">No nodes configured yet.</div>';
+  }
+
+  function renderNodeOverview() {
+    const list = document.getElementById('nodeOverviewList');
+    if (!list) return;
+    list.innerHTML = nodes.length ? nodes.map(node => {
+      const allocations = Array.isArray(node.allocations) ? node.allocations : [];
+      const allocationText = allocations.length ? allocations.map(item => `${escapeHtml(item.ip)}:${item.port}`).join(', ') : 'No IP/port allocations';
+      return `<div class="server-item"><div class="server-info"><div class="server-name">${escapeHtml(node.name)}</div><div class="server-meta">${escapeHtml(node.address)}:${node.port} · ${node.ram} GB RAM · ${node.storage} GB storage · ${node.cores} CPU cores</div><div class="server-meta">Allocations: ${allocationText}</div></div><span class="server-status ${node.status === 'online' ? 'online' : ''}">${node.status === 'online' ? 'Online' : 'Offline'}</span></div>`;
+    }).join('') : '<div class="empty-state">No nodes configured yet.</div>';
+  }
+
+  function openNodeAllocations(nodeId) {
+    const node = nodes.find(item => item.id === nodeId);
+    if (!node) return;
+    node.allocations = Array.isArray(node.allocations) ? node.allocations : [];
+    document.getElementById('allocationNodeId').value = node.id;
+    document.getElementById('nodeAllocationsTitle').textContent = `${node.name} allocations`;
+    document.getElementById('nodeAllocationsPanel').style.display = 'block';
+    renderAllocations(node);
+    document.getElementById('nodeAllocationsPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderAllocations(node) {
+    const list = document.getElementById('allocationList');
+    list.innerHTML = node.allocations.length ? node.allocations.map(allocation => `<div class="server-item">
+      <div class="server-info"><div class="server-name">${escapeHtml(allocation.ip)}:${allocation.port}</div><div class="server-meta">${escapeHtml(allocation.label || 'Available allocation')} · ${allocation.status}</div></div>
+      <div class="server-actions"><button class="btn sm danger" onclick="deleteAllocation('${node.id}','${allocation.id}')">Delete</button></div>
+    </div>`).join('') : '<div class="empty-state">No allocations configured for this node.</div>';
+  }
+
+  function createAllocation(event) {
+    event.preventDefault();
+    const node = nodes.find(item => item.id === document.getElementById('allocationNodeId').value);
+    if (!node) return;
+    const ip = document.getElementById('allocationIpInput').value.trim();
+    const portInput = document.getElementById('allocationPortInput').value.trim();
+    const label = document.getElementById('allocationLabelInput').value.trim();
+    node.allocations = Array.isArray(node.allocations) ? node.allocations : [];
+    const range = portInput.match(/^(\d+)(?:-(\d+))?$/);
+    if (!ip || !range) { toast('Enter a valid IP and port range', 'err'); return; }
+    const firstPort = Number(range[1]);
+    const lastPort = Number(range[2] || range[1]);
+    if (firstPort < 1 || lastPort > 65535 || firstPort > lastPort) { toast('Enter a valid port range from 1 to 65535', 'err'); return; }
+    const requestedPorts = [];
+    for (let port = firstPort; port <= lastPort; port += 1) {
+      if (!node.allocations.some(item => item.ip === ip && item.port === port)) requestedPorts.push(port);
+    }
+    if (!requestedPorts.length) { toast('These allocations already exist', 'err'); return; }
+    requestedPorts.forEach(port => node.allocations.push({ id: `allocation-${Date.now()}-${port}`, ip, port, label, status: 'available' }));
+    saveNodes(); renderAllocations(node); event.target.reset(); document.getElementById('allocationNodeId').value = node.id;
+    toast(`${requestedPorts.length} allocation(s) created`, 'ok');
+  }
+
+  function deleteAllocation(nodeId, allocationId) {
+    const node = nodes.find(item => item.id === nodeId);
+    if (!node) return;
+    node.allocations = node.allocations.filter(item => item.id !== allocationId);
+    saveNodes(); renderAllocations(node); toast('Allocation deleted', 'ok');
+  }
+
+  function createNode(event) {
+    event.preventDefault();
+    const node = {
+      id: `node-${Date.now()}`,
+      name: document.getElementById('nodeNameInput').value.trim(),
+      address: document.getElementById('nodeAddressInput').value.trim(),
+      port: Number(document.getElementById('nodePortInput').value),
+      ram: Number(document.getElementById('nodeRamInput').value),
+      storage: Number(document.getElementById('nodeStorageInput').value),
+      cores: Number(document.getElementById('nodeCoresInput').value),
+      allocations: [],
+      status: 'online'
+    };
+    if (!node.name || !node.address || [node.port, node.ram, node.storage, node.cores].some(value => !Number.isFinite(value) || value < 1)) {
+      toast('Enter valid node details and allocations', 'err'); return;
+    }
+    nodes.push(node); saveNodes(); renderNodes(); document.getElementById('nodeForm').reset();
+    toast(`${node.name} node created`, 'ok');
+  }
+
+  function toggleNode(id) {
+    const node = nodes.find(item => item.id === id);
+    if (!node) return;
+    node.status = node.status === 'online' ? 'offline' : 'online';
+    saveNodes(); renderNodes();
+  }
+
+  function deleteNode(id) {
+    const node = nodes.find(item => item.id === id);
+    if (!node || !confirm(`Delete node ${node.name}?`)) return;
+    nodes = nodes.filter(item => item.id !== id); saveNodes(); renderNodes(); toast(`${node.name} deleted`, 'ok');
+  }
+
+  function visibleServers() {
+    return currentRole === 'admin' ? servers : servers.filter(server => server.owner === getCurrentUsername());
+  }
+
+  function canManageServer(server) {
+    if (!server || (currentRole !== 'admin' && server.owner !== getCurrentUsername())) {
+      toast('You can only manage your own servers', 'err');
+      return false;
+    }
+    return true;
+  }
+
+  function renderServers() {
+    const list = document.getElementById('serverList');
+    const availableServers = visibleServers();
+    const serverMarkup = availableServers.length ? availableServers.map(server => `
+      <div class="server-item" style="cursor:pointer" onclick="openConsoleInNewTab('${server.id}')">
+        <div class="server-info">
+          <div class="server-name">${escapeHtml(server.name)}</div>
+          <div class="server-meta">${server.version} · ${server.java || 'Java 21'} · ${server.memory} RAM · ${server.storage || 25} GB storage · ${server.cores || 2} cores · ${server.docker === false ? 'Host' : 'Docker'} · Port ${server.port} · ${server.players || 0} players</div>
+          <div class="server-status ${server.status === 'online' ? 'online' : ''}">${server.status === 'online' ? 'Online' : 'Offline'}</div>
+        </div>
+        <div class="server-actions">
+          ${currentRole === 'admin' ? `<button class="btn sm danger" onclick="event.stopPropagation();deleteServer('${server.id}')">🗑 Delete</button>` : ''}
+        </div>
+      </div>`).join('') : '<div class="empty-state">No servers assigned to your account yet.</div>';
+    if (list) list.innerHTML = serverMarkup;
+    const dashboardList = document.getElementById('dashboardServerList');
+    if (dashboardList) dashboardList.innerHTML = serverMarkup;
+    const serverCount = document.getElementById('statServers');
+    if (serverCount) serverCount.textContent = availableServers.length;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+  }
+
+  function openCreateServer() {
+    const user = getPanelUsers().find(item => item.username === getCurrentUsername());
+    const ownedServers = servers.filter(server => server.owner === getCurrentUsername());
+    if (currentRole !== 'admin' && (!user || user.canCreate === false)) { toast('Server creation is disabled for your account', 'err'); return; }
+    if (currentRole !== 'admin' && ownedServers.length >= (user.serverLimit ?? 2)) { toast('Your server limit has been reached', 'err'); return; }
+    document.getElementById('serverForm').reset();
+    const ownerSelect = document.getElementById('serverOwnerInput');
+    const availableOwners = currentRole === 'admin' ? getPanelUsers() : [user];
+    ownerSelect.innerHTML = availableOwners.filter(Boolean).map(item => `<option value="${escapeHtml(item.username)}">${escapeHtml(item.username)}</option>`).join('');
+    ownerSelect.value = currentRole === 'admin' ? getCurrentUsername() : getCurrentUsername();
+    ownerSelect.disabled = currentRole !== 'admin';
+    const nodeSelect = document.getElementById('serverNodeInput');
+    nodeSelect.innerHTML = '<option value="">Select a node</option>' + nodes.filter(node => node.status === 'online').map(node => `<option value="${escapeHtml(node.id)}">${escapeHtml(node.name)} (${escapeHtml(node.address)})</option>`).join('');
+    updateServerAllocationOptions();
+    document.getElementById('serverDockerToggle').classList.add('on');
+    document.getElementById('serverModal').classList.add('open');
+    document.getElementById('serverNameInput').focus();
+  }
+
+  function closeServerModal() { document.getElementById('serverModal').classList.remove('open'); }
+
+  function updateServerAllocationOptions() {
+    const node = nodes.find(item => item.id === document.getElementById('serverNodeInput').value);
+    const allocationSelect = document.getElementById('serverAllocationInput');
+    const available = node ? (node.allocations || []).filter(allocation => allocation.status === 'available' && !servers.some(server => server.allocationId === allocation.id)) : [];
+    allocationSelect.innerHTML = '<option value="">Select an allocation</option>' + available.map(allocation => `<option value="${escapeHtml(allocation.id)}">${escapeHtml(allocation.ip)}:${allocation.port}${allocation.label ? ` · ${escapeHtml(allocation.label)}` : ''}</option>`).join('');
+  }
+
+  function createServer(event) {
+    event.preventDefault();
+    const name = document.getElementById('serverNameInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (!name || servers.some(server => server.name === name)) { toast('Choose a unique server name', 'err'); return; }
+    const ownerUsername = currentRole === 'admin' ? document.getElementById('serverOwnerInput').value : getCurrentUsername();
+    const owner = getPanelUsers().find(item => item.username === ownerUsername);
+    const ownedServers = servers.filter(server => server.owner === ownerUsername);
+    const nodeId = document.getElementById('serverNodeInput').value;
+    const allocationId = document.getElementById('serverAllocationInput').value;
+    const node = nodes.find(item => item.id === nodeId);
+    const allocation = node && (node.allocations || []).find(item => item.id === allocationId);
+    const memory = Number.parseInt(document.getElementById('serverMemoryInput').value, 10);
+    const storage = Number.parseInt(document.getElementById('serverStorageInput').value, 10);
+    const cores = Number.parseInt(document.getElementById('serverCoresInput').value, 10);
+    if (currentRole !== 'admin' && (!owner || owner.canCreate === false)) { toast('Server creation is disabled for your account', 'err'); return; }
+    if (currentRole !== 'admin' && ownedServers.length >= (owner.serverLimit ?? 2)) { toast('Your server limit has been reached', 'err'); return; }
+    if (currentRole !== 'admin' && (memory > owner.ramLimit || storage > owner.storageLimit || cores > owner.coresLimit)) { toast('Selected resources exceed your account limits', 'err'); return; }
+    if (!node || !allocation || servers.some(server => server.allocationId === allocationId)) { toast('Select an available node allocation', 'err'); return; }
+    const nextPort = Math.max(25564, ...servers.map(server => server.port)) + 1;
+    const newServer = { id: `${name}-${Date.now()}`, name, owner: ownerUsername, nodeId, allocationId, version: document.getElementById('serverVersionInput').value, java: document.getElementById('serverJavaInput').value, docker: document.getElementById('serverDockerToggle').classList.contains('on'), memory: `${memory} GB`, storage, cores, port: allocation.port, status: 'offline', players: 0 };
+    servers.push(newServer);
+    allocation.status = 'allocated';
+    saveNodes();
+    saveServers(); renderServers(); closeServerModal(); toast(`${name} server created`, 'ok');
+    backendRequest('/servers', { method: 'POST', body: JSON.stringify(newServer) });
+  }
+
+  function toggleServer(id) {
+    const server = servers.find(item => item.id === id);
+    if (!canManageServer(server)) return;
+    server.status = server.status === 'online' ? 'offline' : 'online';
+    server.players = server.status === 'online' ? 1 : 0;
+    if (server.status === 'online') server.startedAt = server.startedAt || Date.now();
+    else delete server.startedAt;
+    saveServers(); renderServers(); toast(`${server.name} ${server.status === 'online' ? 'started' : 'stopped'}`, 'ok');
+  }
+
+  function deleteServer(id) {
+    if (currentRole !== 'admin') { toast('Admin access required', 'err'); return; }
+    const server = servers.find(item => item.id === id);
+    if (!server) return;
+    if (!confirm(`Delete server ${server.name}?`)) return;
+    const node = nodes.find(item => item.id === server.nodeId);
+    const allocation = node && (node.allocations || []).find(item => item.id === server.allocationId);
+    if (allocation) allocation.status = 'available';
+    servers = servers.filter(item => item.id !== id);
+    saveServers();
+    if (node) saveNodes();
+    if (currentServerId === id) closeConsole();
+    renderServers();
+    toast(`${server.name} deleted`, 'ok');
+  }
+
+  function openConsole(id) {
+    const server = servers.find(item => item.id === id);
+    if (!canManageServer(server)) return;
+    currentServerId = id;
+    document.getElementById('consoleTitle').textContent = `${server.name} Console`;
+    document.getElementById('consoleStatus').textContent = `● ${server.status === 'online' ? 'Online' : 'Offline'}`;
+    document.getElementById('consoleStatus').style.color = server.status === 'online' ? 'var(--success)' : 'var(--text-muted)';
+    const assignedNode = nodes.find(item => item.id === server.nodeId);
+    const assignedAllocation = assignedNode && (assignedNode.allocations || []).find(item => item.id === server.allocationId);
+    document.getElementById('metricAddress').textContent = assignedAllocation ? `${assignedAllocation.label ? `${assignedAllocation.label} (${assignedAllocation.ip})` : assignedAllocation.ip}:${assignedAllocation.port}` : `${server.alias || 'localhost'}:${server.port}`;
+    document.getElementById('metricMemory').textContent = `${server.status === 'online' ? '1.53 GB' : '0 GB'} / ${server.memory || '1 GB'}`;
+    document.getElementById('metricDisk').textContent = `${server.status === 'online' ? '214.59 MiB' : '0 MiB'} / ${server.storage || 25} GB`;
+    document.getElementById('metricCpu').textContent = `${server.status === 'online' ? '3.16%' : '0%'} / ${server.cores || 1} cores`;
+    document.getElementById('metricNetwork').textContent = server.status === 'online' ? '4.71 MiB' : '0 MiB';
+    document.getElementById('metricUptime').textContent = server.status === 'online' ? formatUptime(server.startedAt) : 'Offline';
+    document.getElementById('consoleOutput').textContent = '[Panel] Loading real Docker server output...';
+    loadPanelServerLogs(server);
+    document.getElementById('consoleModal').classList.add('open');
+  }
+
+  async function loadPanelServerLogs(server) {
+    try {
+      const result = await backendRequest(`/servers/${encodeURIComponent(server.id)}/logs`);
+      const output = document.getElementById('consoleOutput');
+      output.textContent = result && result.logs ? result.logs : '[Panel] No real server output available. Start the Docker backend and server.';
+      output.scrollTop = output.scrollHeight;
+    } catch {
+      document.getElementById('consoleOutput').textContent = '[Panel] Real server output unavailable.';
+    }
+  }
+
+  function formatUptime(startedAt) {
+    if (!startedAt) return 'Offline';
+    let seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    const days = Math.floor(seconds / 86400); seconds %= 86400;
+    const hours = Math.floor(seconds / 3600); seconds %= 3600;
+    const minutes = Math.floor(seconds / 60); seconds %= 60;
+    return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  function openConsoleInNewTab(id) {
+    const server = servers.find(item => item.id === id);
+    if (!canManageServer(server)) return;
+    const consoleUrl = `server-console.html?server=${encodeURIComponent(id)}`;
+    window.location.assign(`./${consoleUrl}`);
+  }
+
+  function openConsoleFromHash() {
+    const match = window.location.hash.match(/^#console=(.+)$/);
+    if (match) openConsole(decodeURIComponent(match[1]));
+  }
+
+  function closeConsole() { document.getElementById('consoleModal').classList.remove('open'); currentServerId = null; }
+
+  function restartCurrentServer() {
+    const server = servers.find(item => item.id === currentServerId);
+    if (!canManageServer(server)) return;
+    server.status = 'online'; server.players = 1; server.startedAt = Date.now(); saveServers(); renderServers(); openConsole(server.id); toast(`${server.name} restarted`, 'ok');
+    backendRequest(`/servers/${encodeURIComponent(server.id)}/restart`, { method: 'POST' });
+  }
+
+  function startCurrentServer() {
+    const server = servers.find(item => item.id === currentServerId);
+    if (!canManageServer(server)) return;
+    server.status = 'online'; server.players = 1; server.startedAt = server.startedAt || Date.now(); saveServers(); renderServers(); openConsole(server.id); toast(`${server.name} started`, 'ok');
+    backendRequest(`/servers/${encodeURIComponent(server.id)}/start`, { method: 'POST' });
+  }
+
+  function stopCurrentServer() {
+    const server = servers.find(item => item.id === currentServerId);
+    if (!canManageServer(server)) return;
+    server.status = 'offline'; server.players = 0; delete server.startedAt; saveServers(); renderServers(); openConsole(server.id); toast(`${server.name} stopped`, 'ok');
+    backendRequest(`/servers/${encodeURIComponent(server.id)}/stop`, { method: 'POST' });
+  }
+
+  function forceStopCurrentServer() {
+    const server = servers.find(item => item.id === currentServerId);
+    if (!canManageServer(server)) return;
+    server.status = 'offline'; server.players = 0; delete server.startedAt; saveServers(); renderServers(); openConsole(server.id);
+    backendRequest(`/servers/${encodeURIComponent(server.id)}/force-stop`, { method: 'POST' });
+    toast(`${server.name} force stopped`, 'ok');
+  }
+
+
+  function sendConsoleCommand(event) {
+    event.preventDefault();
+    const input = document.getElementById('consoleCommandInput');
+    const command = input.value.trim();
+    if (!command) return;
+    const output = document.getElementById('consoleOutput');
+    const timestamp = new Date().toLocaleTimeString();
+    output.textContent += `\n[${timestamp} INFO]:> ${command}\n[Server] Command sent.\n`;
+    output.scrollTop = output.scrollHeight;
+    input.value = '';
+  }
+
+  function closeModalOnBackdrop(event) { if (event.target === event.currentTarget) event.currentTarget.classList.remove('open'); }
+
+  // ============================================================
+  // PANEL SETTINGS
+  // ============================================================
+  const SETTINGS_KEY = 'nebula-panel-settings';
+  const LOGIN_SETTINGS_KEY = 'nebula-login-settings';
+
+  const DEFAULTS = {
+    panelName: 'Nebula',
+    panelSub: 'Panel v1.0',
+    loginSubtitle: 'Sign in to manage your servers',
+    allowSignup: true,
+    logoEmoji: '⛏️',
+    panelLogoUrl: '',
+    loginLogoUrl: '',
+    bgType: 'preset',
+    bgPreset: '1',
+    bgSolid: '#0d1117',
+    bgG1: '#0d1117',
+    bgG2: '#16203a',
+    bgDir: '135deg',
+    panelBgUrl: '',
+    loginBackgroundUrl: '',
+    bgOverlay: 30,
+    accent1: '#4dd8e6',
+    accent2: '#6b9eff'
+  };
+
+  function getSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return { ...DEFAULTS };
+      const stored = JSON.parse(raw);
+      const settings = { ...DEFAULTS, ...stored };
+      if (stored.panelLogoUrl === undefined && stored.logoUrl) settings.panelLogoUrl = stored.logoUrl;
+      if (stored.panelBgUrl === undefined && stored.bgUrl) settings.panelBgUrl = stored.bgUrl;
+      return settings;
+    } catch { return { ...DEFAULTS }; }
+  }
+  function saveSettings(s) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    if (typeof backendRequest === 'function') backendRequest('/settings', { method: 'POST', body: JSON.stringify(s) });
+  }
+
+  // ---- Panel name ----
+  function liveUpdateName() {
+    const name = document.getElementById('setPanelName').value || 'Nebula';
+    const sub = document.getElementById('setPanelSub').value || '';
+    document.getElementById('brandName').textContent = name;
+    document.getElementById('brandSub').textContent = sub;
+    document.getElementById('logoPreviewName').textContent = name;
+    document.getElementById('logoPreviewSub').textContent = sub;
+  }
+
+  // ---- Logo via URL (or emoji fallback) ----
+  function applyLogo() {
+    const url = document.getElementById('setLogoUrl').value.trim();
+    const emoji = document.getElementById('setLogoEmoji').value || '⛏️';
+
+    const sidebarMark = document.getElementById('brandMark');
+    const previewMark = document.getElementById('logoPreviewMark');
+
+    if (url) {
+      // URL provided — use image
+      sidebarMark.innerHTML = `<img src="${url}" alt="logo" onerror="this.parentNode.textContent='${emoji}'">`;
+      previewMark.innerHTML = `<img src="${url}" alt="logo" onerror="this.parentNode.textContent='${emoji}'">`;
+    } else {
+      // No URL — use emoji
+      sidebarMark.textContent = emoji;
+      previewMark.textContent = emoji;
+    }
+  }
+
+  function clearLogo() {
+    document.getElementById('setLogoUrl').value = '';
+    applyLogo();
+    toast('Logo URL cleared');
+  }
+
+  // ---- Background type switch ----
+  function onBgTypeChange() {
+    const t = document.getElementById('setBgType').value;
+    document.getElementById('bgPresetGroup').style.display = t === 'preset' ? '' : 'none';
+    document.getElementById('bgSolidGroup').style.display = t === 'solid' ? '' : 'none';
+    document.getElementById('bgGradientGroup').style.display = t === 'gradient' ? '' : 'none';
+    document.getElementById('bgImageGroup').style.display = t === 'image' ? '' : 'none';
+    applyBg();
+  }
+
+  function pickPreset(n) {
+    document.querySelectorAll('.preset-swatch').forEach(s =>
+      s.classList.toggle('active', s.dataset.bg == n));
+    applyBg();
+  }
+
+  function applyBg() {
+    const bg = document.getElementById('panelBackground');
+    const preview = document.getElementById('bgPreviewStrip');
+    const type = document.getElementById('setBgType').value;
+    const overlay = (parseInt(document.getElementById('setBgOverlay').value) || 0) / 100;
+    bg.style.setProperty('--panel-overlay', overlay);
+
+    let style = '';
+
+    if (type === 'preset') {
+      const presets = {
+        '1': 'linear-gradient(135deg, #0d1117, #16203a)',
+        '2': 'linear-gradient(135deg, #0f0a1a, #2a1240)',
+        '3': 'linear-gradient(135deg, #0a1410, #103a2a)',
+        '4': 'linear-gradient(135deg, #1a0a0a, #3a1010)',
+        '5': 'linear-gradient(135deg, #0a0f1a, #102040)',
+        '6': 'linear-gradient(135deg, #1a1a1a, #2a2a2a)'
+      };
+      const active = document.querySelector('.preset-swatch.active');
+      const n = active ? active.dataset.bg : '1';
+      style = presets[n];
+    } else if (type === 'solid') {
+      style = document.getElementById('setBgSolid').value;
+    } else if (type === 'gradient') {
+      const g1 = document.getElementById('setBgG1').value;
+      const g2 = document.getElementById('setBgG2').value;
+      const dir = document.getElementById('setBgDir').value;
+      style = `linear-gradient(${dir}, ${g1}, ${g2})`;
+    } else if (type === 'image') {
+      const url = document.getElementById('setBgUrl').value.trim();
+      style = url ? `url("${url}") center/cover no-repeat` : '#0d1117';
+    }
+
+    bg.style.background = style;
+    if (preview) preview.style.background = style;
+  }
+
+  function resetBg() {
+    if (!confirm('Reset background to default?')) return;
+    document.getElementById('setBgType').value = 'preset';
+    document.getElementById('setBgOverlay').value = 30;
+    document.getElementById('overlayVal').textContent = '30%';
+    document.getElementById('setBgUrl').value = '';
+    pickPreset(1);
+    onBgTypeChange();
+    toast('Background reset');
+  }
+
+  function applyAccent() {
+    const c1 = document.getElementById('setAccent1').value;
+    const c2 = document.getElementById('setAccent2').value;
+    const root = document.documentElement;
+    root.style.setProperty('--accent-primary', c1);
+    root.style.setProperty('--accent-secondary', c2);
+    root.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${c1}, ${c2})`);
+  }
+
+  // ---- Save / Reset ----
+  function saveAll() {
+    const existing = getSettings();
+    const s = {
+      panelName: document.getElementById('setPanelName').value,
+      panelSub: document.getElementById('setPanelSub').value,
+      loginSubtitle: existing.loginSubtitle || 'Sign in to manage your servers',
+      allowSignup: existing.allowSignup !== false,
+      logoEmoji: document.getElementById('setLogoEmoji').value,
+      panelLogoUrl: document.getElementById('setLogoUrl').value.trim(),
+      bgType: document.getElementById('setBgType').value,
+      bgPreset: (document.querySelector('.preset-swatch.active') || {}).dataset?.bg || '1',
+      bgSolid: document.getElementById('setBgSolid').value,
+      bgG1: document.getElementById('setBgG1').value,
+      bgG2: document.getElementById('setBgG2').value,
+      bgDir: document.getElementById('setBgDir').value,
+      panelBgUrl: document.getElementById('setBgUrl').value.trim(),
+      bgOverlay: parseInt(document.getElementById('setBgOverlay').value),
+      accent1: document.getElementById('setAccent1').value,
+      accent2: document.getElementById('setAccent2').value
+    };
+    saveSettings(s);
+    toast('✓ Panel settings saved', 'ok');
+  }
+
+  function resetAll() {
+    if (!confirm('Reset all panel settings to default?')) return;
+    localStorage.removeItem(SETTINGS_KEY);
+    loadSettings();
+    toast('Panel settings reset', 'err');
+  }
+
+  // ---- Load into UI ----
+  function loadSettings() {
+    const s = getSettings();
+
+    document.getElementById('setPanelName').value = s.panelName;
+    document.getElementById('setPanelSub').value = s.panelSub;
+    document.getElementById('setLogoEmoji').value = s.logoEmoji;
+    document.getElementById('setLogoUrl').value = s.panelLogoUrl || '';
+    document.getElementById('setBgType').value = s.bgType;
+    document.getElementById('setBgSolid').value = s.bgSolid;
+    document.getElementById('setBgSolidHex').value = s.bgSolid.toUpperCase();
+    document.getElementById('setBgG1').value = s.bgG1;
+    document.getElementById('setBgG1Hex').value = s.bgG1.toUpperCase();
+    document.getElementById('setBgG2').value = s.bgG2;
+    document.getElementById('setBgG2Hex').value = s.bgG2.toUpperCase();
+    document.getElementById('setBgDir').value = s.bgDir;
+    document.getElementById('setBgUrl').value = s.panelBgUrl || '';
+    document.getElementById('setBgOverlay').value = s.bgOverlay;
+    document.getElementById('overlayVal').textContent = s.bgOverlay + '%';
+    document.getElementById('setAccent1').value = s.accent1;
+    document.getElementById('setAccent1Hex').value = s.accent1.toUpperCase();
+    document.getElementById('setAccent2').value = s.accent2;
+    document.getElementById('setAccent2Hex').value = s.accent2.toUpperCase();
+
+    // Sidebar
+    document.getElementById('brandName').textContent = s.panelName;
+    document.getElementById('brandSub').textContent = s.panelSub;
+
+    // Preset active
+    document.querySelectorAll('.preset-swatch').forEach(sw =>
+      sw.classList.toggle('active', sw.dataset.bg === s.bgPreset));
+
+    // Apply everything
+    liveUpdateName();
+    applyLogo();
+    onBgTypeChange();
+    applyAccent();
+    if (!window.__remoteSettingsLoaded) {
+      const apiBase = window.location.port === '8080' ? '/api' : 'http://localhost:8080/api';
+      fetch(`${apiBase}/settings`).then(response => response.ok ? response.json() : null).then(remote => {
+        if (!remote || !Object.keys(remote).length) return;
+        window.__remoteSettingsLoaded = true;
+        const sharedSettings = { ...getSettings(), ...remote };
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(sharedSettings));
+        applySharedPanelBranding(sharedSettings);
+        loadSettings();
+      }).catch(() => {});
+    }
+  }
+
+  function applySharedPanelBranding(settings) {
+    document.title = settings.panelName ? `${settings.panelName} Panel` : document.title;
+    document.getElementById('brandName').textContent = settings.panelName || 'Xzy Panel';
+    document.getElementById('brandSub').textContent = settings.panelSub || 'Panel v1.0';
+    const mark = document.getElementById('brandMark');
+    if (settings.panelLogoUrl) {
+      mark.innerHTML = `<img src="${settings.panelLogoUrl}" alt="Panel logo" onerror="this.parentElement.textContent='${settings.logoEmoji || '⛏️'}'">`;
+    } else mark.textContent = settings.logoEmoji || '⛏️';
+    const background = document.getElementById('panelBackground');
+    if (settings.bgType === 'image' && (settings.panelBgUrl || settings.loginBackgroundUrl)) {
+      background.style.background = `url("${settings.panelBgUrl || settings.loginBackgroundUrl}") center/cover fixed`;
+    } else if (settings.bgType === 'solid') {
+      background.style.background = settings.bgSolid || '#0d1117';
+    } else if (settings.bgType === 'gradient') {
+      background.style.background = `linear-gradient(${settings.bgDir || '135deg'}, ${settings.bgG1 || '#0d1117'}, ${settings.bgG2 || '#16203a'})`;
+    }
+    if (settings.accent1 && settings.accent2) {
+      document.documentElement.style.setProperty('--accent-primary', settings.accent1);
+      document.documentElement.style.setProperty('--accent-secondary', settings.accent2);
+      document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${settings.accent1}, ${settings.accent2})`);
+    }
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  function toggleSwitch(el) { el.classList.toggle('on'); }
+
+  function toast(msg, type = '') {
+    const t = document.createElement('div');
+    t.className = 'toast ' + type;
+    t.textContent = msg;
+    document.getElementById('toasts').appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  setRole('user');
+  updateCurrentUserPresence();
+  setInterval(() => { updateCurrentUserPresence(); renderUsers(); }, 20000);
+  renderServers();
+  renderUsers();
+  syncRemotePanelUsers();
+  loadSettings();
+  loadLoginCustomization();
+  openConsoleFromHash();
+</script>
+
+</body>
+</html>

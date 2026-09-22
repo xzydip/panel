@@ -1,0 +1,9 @@
+{
+  "name": "xzy-panel-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Docker-backed Minecraft server control API for Xzy Panel",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
